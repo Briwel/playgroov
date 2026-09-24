@@ -1,0 +1,7 @@
+basic-pitch
+flask
+gunicorn
+tensorflow
+fastapi
+uvicorn
+python-multipart

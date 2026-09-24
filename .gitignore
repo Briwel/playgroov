@@ -1,0 +1,47 @@
+# Dependencies and generated output
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+web-build/
+**/.expo/
+.expo/
+.turbo/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+apps/backend/env.config
+
+# Local audio, databases, and model output
+apps/backend/uploads/
+apps/backend/test.txt
+**/uploads/
+*.db
+*.sqlite
+*.sqlite3
+*.mp3
+*.wav
+*.mid
+*.midi
+*.pt
+*.pth
+*.ckpt
+
+# Python environments and caches
+.venv/
+**/.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+
+# Local editor and build caches
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

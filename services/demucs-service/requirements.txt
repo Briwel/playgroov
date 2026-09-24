@@ -1,0 +1,8 @@
+demucs
+torch
+torchaudio
+flask
+gunicorn
+fastapi
+uvicorn
+python-multipart

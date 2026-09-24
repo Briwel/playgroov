@@ -1,0 +1,14 @@
+{
+  "name": "pocketgroove-studio",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "scripts": {
+    "setup": "npm install"
+  },
+  "dependencies": {
+    "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417"
+  }
+}
