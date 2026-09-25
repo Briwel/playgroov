@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { ArrowRight, AudioLines, Check, FileAudio2, Upload } from 'lucide-react-native';
 import axios from 'axios';
@@ -18,6 +18,7 @@ const steps = [
 ];
 
 export default function ImportScreen() {
+  const compact = useWindowDimensions().width < 600;
   const params = useLocalSearchParams<{ trackId?: string | string[] }>();
   const requestedTrackId = Array.isArray(params.trackId) ? params.trackId[0] : params.trackId;
   const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
@@ -155,7 +156,10 @@ export default function ImportScreen() {
         : typeof serverMessage === 'string'
           ? serverMessage
           : null;
-      setError(reason ?? 'Le traitement a échoué. Vérifiez que le service audio est démarré, puis réessayez.');
+      const statusCode = axios.isAxiosError(processingError) ? processingError.response?.status : undefined;
+      setError(statusCode === 502
+        ? `Le service Demucs ne répond pas. Vérifiez qu’il est démarré sur le PC (port 8000), puis réessayez.${reason ? ` Détail : ${reason}` : ''}`
+        : reason ?? 'Le traitement a échoué. Vérifiez que le service audio est démarré, puis réessayez.');
       setStatus(step === 'stem-separation' ? 'IMPORTED' : 'SPLIT');
     } finally {
       setBusy(false);
@@ -165,20 +169,20 @@ export default function ImportScreen() {
   const currentStep = !trackId ? 0 : status === 'IMPORTED' || status === 'SPLITTING' ? 1 : status === 'SPLIT' || status === 'TRANSCRIBING' ? 2 : 3;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.page, compact && styles.pageCompact]}>
       <View style={styles.topbar}>
         <BackButton />
         <View style={styles.brand}><View style={styles.brandMark}><AudioLines size={16} color={theme.colors.nuitStudio} /></View><Text style={styles.brandText}>POCKETGROOVE <Text style={styles.brandSub}>/ IMPORT</Text></Text></View>
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, compact && styles.contentCompact]}>
         <View style={styles.heading}>
           <Text style={styles.eyebrow}>NOUVELLE SESSION · ÉTAPE {String(Math.min(currentStep + 1, 3)).padStart(2, '0')}</Text>
-          <Text style={styles.title}>Faites entrer{ '\n' }le morceau.</Text>
+          <Text style={[styles.title, compact && styles.titleCompact]}>Faites entrer{ '\n' }le morceau.</Text>
           <Text style={styles.description}>Choisissez une source audio. On prépare ensuite chaque élément pour votre session.</Text>
         </View>
 
-        <View style={styles.stepper}>
+        <View style={[styles.stepper, compact && styles.stepperCompact]}>
           {steps.map((step, index) => {
             const complete = currentStep > index;
             const active = currentStep === index;
@@ -187,14 +191,14 @@ export default function ImportScreen() {
                 <View style={[styles.stepNumber, complete && styles.stepComplete, active && styles.stepActive]}>
                   {complete ? <Check size={13} color={theme.colors.nuitStudio} /> : <Text style={[styles.stepNumberText, active && styles.stepNumberActive]}>{step.number}</Text>}
                 </View>
-                <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{step.label}</Text>
-                {index < steps.length - 1 && <View style={[styles.stepLine, complete && styles.stepLineComplete]} />}
+                <Text style={[styles.stepLabel, compact && styles.stepLabelCompact, active && styles.stepLabelActive]}>{step.label}</Text>
+                {index < steps.length - 1 && <View style={[styles.stepLine, compact && styles.stepLineCompact, complete && styles.stepLineComplete]} />}
               </View>
             );
           })}
         </View>
 
-        <View style={styles.panel}>
+        <View style={[styles.panel, compact && styles.panelCompact]}>
           <View style={styles.panelHeading}>
             <View><Text style={styles.panelTitle}>Votre source audio</Text><Text style={styles.panelHint}>Un fichier à la fois · jusqu’à 100 Mo</Text></View>
             <View style={styles.formatPill}><Text style={styles.formatText}>AUDIO</Text></View>
@@ -282,6 +286,7 @@ function statusDetail(status: TrackStatus) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.nuitStudio },
   page: { width: '100%', maxWidth: 1040, alignSelf: 'center', paddingHorizontal: 24, paddingBottom: 48 },
+  pageCompact: { paddingHorizontal: 16, paddingBottom: 32 },
   topbar: { height: 68, borderBottomWidth: 1, borderBottomColor: theme.colors.ligne, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backLink: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   backText: { color: theme.colors.grisSignal, fontSize: 12 },
@@ -290,11 +295,14 @@ const styles = StyleSheet.create({
   brandText: { color: theme.colors.blancCasse, fontWeight: '700', fontSize: 10, letterSpacing: 1.1 },
   brandSub: { color: theme.colors.grisSignal, fontWeight: '400' },
   content: { width: '100%', maxWidth: 620, alignSelf: 'center', paddingTop: 50 },
+  contentCompact: { paddingTop: 28 },
   heading: { alignItems: 'center' },
   eyebrow: { color: theme.colors.vertStudio, fontSize: 10, letterSpacing: 1.6, fontWeight: '700' },
   title: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontSize: 42, lineHeight: 47, fontWeight: '600', letterSpacing: -1.7, textAlign: 'center', marginTop: 12 },
+  titleCompact: { fontSize: 34, lineHeight: 39, letterSpacing: -1.2 },
   description: { color: theme.colors.grisSignal, fontFamily: theme.typography.manrope.regular, fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 390, marginTop: 12 },
   stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 28, marginBottom: 24 },
+  stepperCompact: { marginTop: 22, marginBottom: 18 },
   step: { flexDirection: 'row', alignItems: 'center' },
   stepNumber: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: theme.colors.ligne, alignItems: 'center', justifyContent: 'center' },
   stepActive: { borderColor: theme.colors.vertStudio },
@@ -302,10 +310,13 @@ const styles = StyleSheet.create({
   stepNumberText: { color: theme.colors.grisSignal, fontSize: 8, fontWeight: '700' },
   stepNumberActive: { color: theme.colors.vertStudio },
   stepLabel: { color: theme.colors.grisSignal, fontSize: 11, marginLeft: 7 },
+  stepLabelCompact: { fontSize: 10, marginLeft: 5 },
   stepLabelActive: { color: theme.colors.blancCasse },
   stepLine: { height: 1, width: 32, backgroundColor: theme.colors.ligne, marginHorizontal: 11 },
+  stepLineCompact: { width: 12, marginHorizontal: 5 },
   stepLineComplete: { backgroundColor: theme.colors.vertStudio },
   panel: { padding: 20, borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 14, backgroundColor: theme.colors.console },
+  panelCompact: { padding: 14, borderRadius: 12 },
   panelHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
   panelTitle: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontWeight: '600', fontSize: 14 },
   panelHint: { color: theme.colors.grisSignal, fontSize: 11, marginTop: 4 },

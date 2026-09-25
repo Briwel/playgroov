@@ -16,7 +16,6 @@ export default function HomeScreen() {
           <View style={styles.brandMark}><AudioLines size={18} color={theme.colors.nuitStudio} /></View>
           <Text style={styles.brandName}>pocketgroove<Text style={styles.brandStudio}> / STUDIO</Text></Text>
         </View>
-        <View style={styles.sessionBadge}><View style={styles.statusDot} /><Text style={styles.sessionText}>VOTRE ESPACE STUDIO</Text></View>
       </View>
 
       <View style={[styles.hero, compact && styles.heroCompact]}>
@@ -79,21 +78,23 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.nuitStudio },
   page: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: 28, paddingBottom: 48 },
-  pageCompact: { paddingHorizontal: 20 },
+  pageCompact: { paddingHorizontal: 18, paddingBottom: 32 },
   topbar: { minHeight: 76, borderBottomWidth: 1, borderBottomColor: theme.colors.ligne, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   brandMark: { width: 30, height: 30, borderRadius: 9, backgroundColor: theme.colors.vertStudio, alignItems: 'center', justifyContent: 'center' },
   brandName: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontSize: 14, fontWeight: '700', letterSpacing: -0.3 },
   brandStudio: { color: theme.colors.grisSignal, fontSize: 10, letterSpacing: 1.5 },
   sessionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: theme.colors.ligne, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 99 },
+  sessionBadgeCompact: { gap: 6, paddingHorizontal: 8, paddingVertical: 7 },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.vertStudio },
   sessionText: { color: theme.colors.grisSignal, fontSize: 10, letterSpacing: 1.1 },
+  sessionTextCompact: { fontSize: 8, letterSpacing: 0.6 },
   hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 68, paddingBottom: 72, gap: 28 },
   heroCompact: { flexDirection: 'column', alignItems: 'stretch', paddingTop: 43, paddingBottom: 48, gap: 30 },
   heroCopy: { flex: 1, maxWidth: 590 },
   eyebrow: { color: theme.colors.vertStudio, fontSize: 10, letterSpacing: 2, fontWeight: '700' },
   headline: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontSize: 54, lineHeight: 59, fontWeight: '600', letterSpacing: -2.5, marginTop: 16 },
-  headlineCompact: { fontSize: 41, lineHeight: 47, letterSpacing: -1.8 },
+  headlineCompact: { fontSize: 36, lineHeight: 42, letterSpacing: -1.5 },
   headlineAccent: { color: theme.colors.vertStudio, fontStyle: 'italic' },
   intro: { color: theme.colors.grisSignal, fontFamily: theme.typography.manrope.regular, fontSize: 15, lineHeight: 24, maxWidth: 470, marginTop: 17 },
   primaryLink: { marginTop: 26, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.vertStudio, paddingVertical: 13, paddingHorizontal: 18, borderRadius: 8 },

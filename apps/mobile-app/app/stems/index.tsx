@@ -213,8 +213,8 @@ export default function MixerScreen() {
         <View style={[styles.headingRow, compact && styles.headingCompact]}>
           <View style={styles.headingCopy}>
             <Text style={styles.eyebrow}>VOTRE SESSION</Text>
-            <Text style={styles.title}>{track?.title ?? 'Mixeur audio'}</Text>
-            <Text style={styles.subtitle}>{trackCount > 0 ? `${trackCount} piste${trackCount > 1 ? 's' : ''} séparée${trackCount > 1 ? 's' : ''} · Réglez le volume, isolez ou coupez chaque instrument.` : 'Retrouvez ici les instruments séparés de votre morceau.'}</Text>
+            <Text style={[styles.title, compact && styles.titleCompact]}>{track?.title ?? 'Mixeur audio'}</Text>
+            <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>{trackCount > 0 ? `${trackCount} piste${trackCount > 1 ? 's' : ''} séparée${trackCount > 1 ? 's' : ''} · Réglez le volume, isolez ou coupez chaque instrument.` : 'Retrouvez ici les instruments séparés de votre morceau.'}</Text>
           </View>
           <Link href="/import" asChild><Pressable style={styles.newTrackButton}><AudioWaveform size={16} color={theme.colors.nuitStudio} /><Text style={styles.newTrackText}>Importer un morceau</Text></Pressable></Link>
         </View>
@@ -230,19 +230,19 @@ export default function MixerScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.mixerToolbar}>
+            <View style={[styles.mixerToolbar, compact && styles.mixerToolbarCompact]}>
               <View style={styles.trackCount}><Text style={styles.trackCountNumber}>{trackCount}</Text><Text style={styles.trackCountLabel}>{trackCount > 1 ? 'PISTES AUDIO' : 'PISTE AUDIO'}</Text></View>
               <View style={styles.toolbarDivider} />
               <View style={styles.mixerMode}><SlidersHorizontal size={15} color={theme.colors.vertStudio} /><Text style={styles.mixerModeText}>CONTRÔLES DE PISTE</Text><ChevronDown size={13} color={theme.colors.grisSignal} /></View>
-              <View style={styles.toolbarSpacer} />
+              <View style={[styles.toolbarSpacer, compact && styles.toolbarSpacerCompact]} />
               <Pressable onPress={() => { setMuted([]); setSolo(null); setLevels(Object.fromEntries(loadedStems.map((stem) => [stem.filename, 7]))); setMasterLevel(12); }} style={styles.resetButton}><RotateCcw size={14} color={theme.colors.grisSignal} /><Text style={styles.resetText}>Réinitialiser</Text></Pressable>
             </View>
 
-            <View style={styles.meterHeader}>
+            {!compact && <View style={styles.meterHeader}>
               <Text style={styles.columnLabel}>INSTRUMENT</Text>
               <Text style={[styles.columnLabel, styles.gainColumnLabel]}>NIVEAU</Text>
               <Text style={styles.columnLabel}>SOLO · COUPER</Text>
-            </View>
+            </View>}
 
             <View style={styles.trackList}>
               {loadedStems.map((stem) => (
@@ -262,13 +262,13 @@ export default function MixerScreen() {
             </View>
 
             <View style={[styles.masterRow, compact && styles.masterCompact]}>
-              <View style={styles.masterIdentity}><View style={styles.masterIcon}><Volume2 size={17} color={theme.colors.vertStudio} /></View><View><Text style={styles.masterTitle}>Volume général</Text><Text style={styles.masterSub}>TOUTES LES PISTES</Text></View></View>
-              <View style={styles.masterSlider}>
+              <View style={[styles.masterIdentity, compact && styles.masterIdentityCompact]}><View style={styles.masterIcon}><Volume2 size={17} color={theme.colors.vertStudio} /></View><View><Text style={styles.masterTitle}>Volume général</Text><Text style={styles.masterSub}>TOUTES LES PISTES</Text></View></View>
+              <View style={[styles.masterSlider, compact && styles.masterSliderCompact]}>
                 <Pressable onPress={() => setMasterLevel((value) => Math.max(0, value - 1))} style={styles.masterButton}><Text style={styles.masterButtonText}>−</Text></Pressable>
                 <View style={styles.masterSegments}>{Array.from({ length: 12 }, (_, index) => <View key={index} style={[styles.masterSegment, index < masterLevel && styles.masterSegmentActive]} />)}</View>
                 <Pressable onPress={() => setMasterLevel((value) => Math.min(12, value + 1))} style={styles.masterButton}><Text style={styles.masterButtonText}>+</Text></Pressable>
               </View>
-              <View style={styles.masterOutput}><Headphones size={16} color={theme.colors.grisSignal} /><Text style={styles.masterOutputText}>{masterLevel === 0 ? '−∞ dB' : `${((masterLevel - 12) * 2) > 0 ? '+' : '−'}${String(Math.abs((masterLevel - 12) * 2)).padStart(2, '0')} dB`}</Text></View>
+              <View style={[styles.masterOutput, compact && styles.masterOutputCompact]}><Headphones size={16} color={theme.colors.grisSignal} /><Text style={styles.masterOutputText}>{masterLevel === 0 ? '−∞ dB' : `${((masterLevel - 12) * 2) > 0 ? '+' : '−'}${String(Math.abs((masterLevel - 12) * 2)).padStart(2, '0')} dB`}</Text></View>
             </View>
 
             <TransportBar
@@ -289,23 +289,26 @@ export default function MixerScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.nuitStudio },
   page: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingHorizontal: 24, paddingBottom: 40 },
-  pageCompact: { paddingHorizontal: 12 },
+  pageCompact: { paddingHorizontal: 14, paddingBottom: 28 },
   topbar: { height: 70, borderBottomWidth: 1, borderBottomColor: theme.colors.ligne, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topbarSpacer: { width: 86 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brandMark: { width: 28, height: 28, borderRadius: 8, backgroundColor: theme.colors.vertStudio, alignItems: 'center', justifyContent: 'center' },
   brandText: { color: theme.colors.blancCasse, fontWeight: '700', fontSize: 11, letterSpacing: 1 },
   brandSub: { color: theme.colors.grisSignal, fontWeight: '400' },
-  content: { paddingTop: 34 },
+  content: { paddingTop: 28 },
   headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 18 },
   headingCompact: { flexDirection: 'column', alignItems: 'flex-start' },
   headingCopy: { flex: 1 },
   eyebrow: { color: theme.colors.vertStudio, fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
   title: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontSize: 32, lineHeight: 39, fontWeight: '600', letterSpacing: -0.8, marginTop: 7 },
+  titleCompact: { fontSize: 27, lineHeight: 33, letterSpacing: -0.5 },
   subtitle: { color: theme.colors.grisSignal, fontSize: 13, lineHeight: 19, marginTop: 6, maxWidth: 630 },
-  newTrackButton: { minHeight: 42, borderRadius: 8, backgroundColor: theme.colors.vertStudio, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 14 },
+  subtitleCompact: { fontSize: 12, lineHeight: 18 },
+  newTrackButton: { minHeight: 44, borderRadius: 8, backgroundColor: theme.colors.vertStudio, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 14 },
   newTrackText: { color: theme.colors.nuitStudio, fontSize: 12, fontWeight: '700' },
   mixerToolbar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 24, borderBottomWidth: 1, borderBottomColor: theme.colors.ligne },
+  mixerToolbarCompact: { minHeight: 54, flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6, paddingVertical: 8, marginTop: 18 },
   trackCount: { flexDirection: 'row', gap: 7, alignItems: 'baseline' },
   trackCountNumber: { color: theme.colors.blancCasse, fontSize: 16, fontWeight: '700' },
   trackCountLabel: { color: theme.colors.grisSignal, fontSize: 10, letterSpacing: 0.8 },
@@ -313,6 +316,7 @@ const styles = StyleSheet.create({
   mixerMode: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   mixerModeText: { color: theme.colors.grisSignal, fontSize: 10, letterSpacing: 0.6 },
   toolbarSpacer: { flex: 1 },
+  toolbarSpacerCompact: { display: 'none' },
   resetButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 8 },
   resetText: { color: theme.colors.grisSignal, fontSize: 11 },
   meterHeader: { height: 38, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
@@ -320,18 +324,21 @@ const styles = StyleSheet.create({
   gainColumnLabel: { flex: 1, textAlign: 'center' },
   trackList: { gap: 8 },
   masterRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 14, marginBottom: 16, padding: 12, borderWidth: 1, borderColor: '#45513A', borderRadius: 10, backgroundColor: '#1D2319' },
-  masterCompact: { gap: 9, paddingHorizontal: 8 },
+  masterCompact: { flexWrap: 'wrap', gap: 8, paddingHorizontal: 9, paddingVertical: 10 },
   masterIdentity: { flex: 1, minWidth: 125, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  masterIdentityCompact: { flexGrow: 1, flexBasis: '62%', minWidth: 150 },
   masterIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#303A25', alignItems: 'center', justifyContent: 'center' },
   masterTitle: { color: theme.colors.vertStudio, fontSize: 12, fontWeight: '700' },
   masterSub: { color: theme.colors.grisSignal, fontSize: 9, letterSpacing: 0.6, marginTop: 3 },
   masterSlider: { flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  masterSliderCompact: { flexBasis: '100%', flexGrow: 1 },
   masterButton: { width: 30, height: 30, borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   masterButtonText: { color: theme.colors.blancCasse, fontSize: 19, lineHeight: 22 },
   masterSegments: { flex: 1, height: 20, flexDirection: 'row', alignItems: 'center', gap: 3 },
   masterSegment: { flex: 1, height: 9, borderRadius: 3, backgroundColor: '#383B35' },
   masterSegmentActive: { backgroundColor: theme.colors.vertStudio },
   masterOutput: { minWidth: 83, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
+  masterOutputCompact: { minWidth: 58, flex: 0 },
   masterOutputText: { color: theme.colors.blancCasse, fontSize: 11, fontVariant: ['tabular-nums'] },
   stateCard: { minHeight: 250, marginTop: 28, padding: 28, borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 13, backgroundColor: theme.colors.console, alignItems: 'center', justifyContent: 'center' },
   stateIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#303A25', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },

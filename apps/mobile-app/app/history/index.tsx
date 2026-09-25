@@ -87,11 +87,11 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.headingRow}>
+        <View style={[styles.content, compact && styles.contentCompact]}>
+        <View style={[styles.headingRow, compact && styles.headingRowCompact]}>
           <View style={styles.headingCopy}>
             <Text style={styles.eyebrow}>VOTRE BIBLIOTHÈQUE DE STUDIO</Text>
-            <Text style={styles.title}>Vos morceaux.</Text>
+            <Text style={[styles.title, compact && styles.titleCompact]}>Vos morceaux.</Text>
             <Text style={styles.description}>Retrouvez vos sources et reprenez chaque session là où vous l’avez laissée.</Text>
           </View>
           <Pressable onPress={() => void loadHistory(true)} disabled={refreshing} style={styles.refreshButton} accessibilityRole="button" accessibilityLabel="Actualiser l’historique">
@@ -134,7 +134,7 @@ export default function HistoryScreen() {
                 ? { pathname: '/stems', params: { trackId: track.id } }
                 : { pathname: '/import', params: { trackId: track.id } }) as Href;
               return (
-                <View key={track.id} style={styles.trackEntry}>
+                <View key={track.id} style={[styles.trackEntry, compact && styles.trackEntryCompact]}>
                   <Pressable
                     onPress={() => router.push(href)}
                     style={({ pressed }) => [styles.trackCard, compact && styles.trackCardCompact, pressed && styles.trackCardPressed]}
@@ -170,13 +170,13 @@ export default function HistoryScreen() {
                   >
                     {deletingTrackId === track.id ? <ActivityIndicator size="small" color={theme.colors.state.erreur} /> : <Trash2 size={17} color={theme.colors.grisSignal} />}
                   </Pressable>
-                  {deleteTarget?.id === track.id && <View style={styles.confirmBox}>
+                  {deleteTarget?.id === track.id && <View style={[styles.confirmBox, compact && styles.confirmBoxCompact]}>
                     <View style={styles.confirmCopy}>
                       <Text style={styles.confirmTitle}>Supprimer ce morceau ?</Text>
                       <Text style={styles.confirmText}>La source audio et les pistes associées seront effacées du studio.</Text>
                       {deleteError && <Text style={styles.deleteErrorText}>{deleteError}</Text>}
                     </View>
-                    <View style={styles.confirmActions}>
+                    <View style={[styles.confirmActions, compact && styles.confirmActionsCompact]}>
                       <Pressable onPress={() => { setDeleteTarget(null); setDeleteError(null); }} style={styles.cancelDeleteButton} accessibilityRole="button">
                         <X size={14} color={theme.colors.grisSignal} /><Text style={styles.cancelDeleteText}>Annuler</Text>
                       </Pressable>
@@ -209,17 +209,20 @@ function formatDate(value: string) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.nuitStudio },
   page: { width: '100%', maxWidth: 1040, alignSelf: 'center', paddingHorizontal: 28, paddingBottom: 48 },
-  pageCompact: { paddingHorizontal: 18 },
+  pageCompact: { paddingHorizontal: 16, paddingBottom: 32 },
   topbar: { height: 68, borderBottomWidth: 1, borderBottomColor: theme.colors.ligne, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brandMark: { width: 26, height: 26, borderRadius: 8, backgroundColor: theme.colors.vertStudio, alignItems: 'center', justifyContent: 'center' },
   brandText: { color: theme.colors.blancCasse, fontWeight: '700', fontSize: 10, letterSpacing: 1.1 },
   brandSub: { color: theme.colors.grisSignal, fontWeight: '400' },
   content: { width: '100%', maxWidth: 780, alignSelf: 'center', paddingTop: 54 },
+  contentCompact: { paddingTop: 32 },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  headingRowCompact: { alignItems: 'flex-start', gap: 10 },
   headingCopy: { flex: 1 },
   eyebrow: { color: theme.colors.vertStudio, fontSize: 10, letterSpacing: 1.7, fontWeight: '700' },
   title: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontSize: 38, lineHeight: 45, fontWeight: '600', letterSpacing: -1.2, marginTop: 10 },
+  titleCompact: { fontSize: 32, lineHeight: 37 },
   description: { color: theme.colors.grisSignal, fontFamily: theme.typography.manrope.regular, fontSize: 14, lineHeight: 21, maxWidth: 520, marginTop: 9 },
   refreshButton: { width: 42, height: 42, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.ligne, backgroundColor: theme.colors.console, alignItems: 'center', justifyContent: 'center' },
   libraryBar: { marginTop: 32, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
@@ -231,8 +234,9 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, padding: 0, color: theme.colors.blancCasse, fontSize: 12 },
   trackList: { gap: 9 },
   trackEntry: { width: '100%', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  trackEntryCompact: { alignItems: 'stretch' },
   trackCard: { flex: 1, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 15, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 12, backgroundColor: theme.colors.console },
-  trackCardCompact: { minHeight: 76, gap: 10, paddingHorizontal: 11, paddingVertical: 11, flexWrap: 'wrap' },
+  trackCardCompact: { minHeight: 80, gap: 9, paddingHorizontal: 10, paddingVertical: 10, flexWrap: 'wrap' },
   trackCardPressed: { borderColor: '#596544', backgroundColor: '#1E211B' },
   trackIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#252923' },
   trackIconReady: { backgroundColor: '#303A25' },
@@ -253,11 +257,13 @@ const styles = StyleSheet.create({
   deleteButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 10, backgroundColor: theme.colors.console },
   deleteButtonPressed: { borderColor: '#633C37', backgroundColor: '#2A1D1A' },
   confirmBox: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: 15, borderWidth: 1, borderColor: '#633C37', borderRadius: 10, backgroundColor: '#241C19' },
+  confirmBoxCompact: { flexDirection: 'column', alignItems: 'stretch', gap: 12, padding: 12 },
   confirmCopy: { flex: 1 },
   confirmTitle: { color: theme.colors.blancCasse, fontSize: 13, fontWeight: '700' },
   confirmText: { marginTop: 4, color: theme.colors.grisSignal, fontSize: 11, lineHeight: 16 },
   deleteErrorText: { marginTop: 6, color: '#F0A198', fontSize: 11 },
   confirmActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  confirmActionsCompact: { justifyContent: 'flex-end', flexWrap: 'wrap' },
   cancelDeleteButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 7 },
   cancelDeleteText: { color: theme.colors.grisSignal, fontSize: 11, fontWeight: '600' },
   confirmDeleteButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 11, borderRadius: 7, backgroundColor: '#A9463E' },
