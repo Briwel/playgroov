@@ -9,6 +9,7 @@ import { BackButton } from '../../src/components/BackButton';
 import { TrackStrip } from '../../src/components/TrackStrip';
 import { TransportBar } from '../../src/components/TransportBar';
 import { API_URL } from '../../src/constants/api';
+import { subscribeToTrackDeleted } from '../../src/state/track-events';
 import { theme } from '../../src/theme';
 
 type Stem = { filename: string; name: string; taskId: string };
@@ -56,10 +57,31 @@ export default function MixerScreen() {
   const [error, setError] = useState<string | null>(null);
   const soundsRef = useRef<LoadedStem[]>([]);
   const positionRef = useRef(0);
+  const deletedTrackIdRef = useRef<string | null>(null);
+
+  useEffect(() => subscribeToTrackDeleted((deletedTrackId) => {
+    if (deletedTrackId !== trackId) return;
+
+    deletedTrackIdRef.current = deletedTrackId;
+    const players = soundsRef.current;
+    soundsRef.current = [];
+    players.forEach(({ sound }) => {
+      try { sound.pause(); } catch { /* The player may already be released. */ }
+      try { sound.remove(); } catch { /* Continue releasing the remaining players. */ }
+    });
+    setLoadedStems([]);
+    setPlaying(false);
+    setPosition(0);
+    setDuration(0);
+    setTrack(null);
+    setLoading(false);
+    setError('Ce morceau a été supprimé. La lecture a été arrêtée.');
+  }), [trackId]);
 
   useEffect(() => {
     let cancelled = false;
     const createdSounds: LoadedStem[] = [];
+    deletedTrackIdRef.current = null;
     soundsRef.current = [];
     setTrack(null);
     setLoadedStems([]);
@@ -79,7 +101,7 @@ export default function MixerScreen() {
       try {
         const response = await axios.get<Track>(`${API_URL}/tracks/${trackId}`);
         const currentTrack = response.data;
-        if (cancelled) return;
+        if (cancelled || deletedTrackIdRef.current === trackId) return;
         setTrack(currentTrack);
 
         if (!currentTrack.stems?.length) {
@@ -100,7 +122,7 @@ export default function MixerScreen() {
           await new Promise<void>((resolve, reject) => {
             let settled = false;
             const subscription = sound.addListener('playbackStatusUpdate', (status) => {
-              if (cancelled) {
+              if (cancelled || deletedTrackIdRef.current === trackId) {
                 if (!settled) {
                   settled = true;
                   resolve();
@@ -137,7 +159,7 @@ export default function MixerScreen() {
         if (failedLoad?.status === 'rejected') throw failedLoad.reason;
         const loaded = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
 
-        if (cancelled) {
+        if (cancelled || deletedTrackIdRef.current === trackId) {
           createdSounds.forEach(({ sound }) => sound.remove());
           return;
         }
@@ -148,9 +170,9 @@ export default function MixerScreen() {
       } catch (loadError) {
         console.error('Unable to load separated tracks', loadError);
         createdSounds.forEach(({ sound }) => sound.remove());
-        if (!cancelled) setError('Impossible de charger les pistes audio. Vérifiez la connexion au serveur puis réessayez.');
+        if (!cancelled && deletedTrackIdRef.current !== trackId) setError('Impossible de charger les pistes audio. Vérifiez la connexion au serveur puis réessayez.');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && deletedTrackIdRef.current !== trackId) setLoading(false);
       }
     };
 

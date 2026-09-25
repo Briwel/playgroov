@@ -27,6 +27,7 @@ export default function ImportScreen() {
   const [progress, setProgress] = useState(0);
   const [trackId, setTrackId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -54,7 +55,10 @@ export default function ImportScreen() {
   useEffect(() => {
     if (!trackId) return;
     let active = true;
-    const interval = setInterval(async () => {
+    let keepPolling = true;
+    let delay = status === 'SPLITTING' ? 1500 : 2500;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
       try {
         if (status === 'SPLITTING') {
           const response = await axios.get(`${API_URL}/stem-separation/${trackId}/status`);
@@ -63,24 +67,34 @@ export default function ImportScreen() {
           if (response.data.status === 'COMPLETED') {
             setProgress(100);
             setStatus('SPLIT');
-            clearInterval(interval);
+            keepPolling = false;
           } else if (response.data.status === 'FAILED') {
             setError(response.data.error ?? 'La séparation des pistes a échoué.');
             setStatus('IMPORTED');
-            clearInterval(interval);
+            keepPolling = false;
           }
         } else {
           const response = await axios.get(`${API_URL}/tracks/${trackId}`);
           const nextStatus = response.data.status as TrackStatus;
           if (!active) return;
           setStatus(nextStatus);
-          if (nextStatus === 'READY' || nextStatus === 'SPLIT') clearInterval(interval);
+          if (nextStatus === 'READY' || nextStatus === 'SPLIT') keepPolling = false;
         }
+        setConnectionWarning(null);
       } catch (pollError) {
+        if (!active) return;
         console.error('Status check failed', pollError);
+        const offline = axios.isAxiosError(pollError) && !pollError.response;
+        setConnectionWarning(offline
+          ? 'Connexion au backend interrompue. Vérifiez qu’il reste démarré sur le PC ; la vérification reprendra automatiquement.'
+          : 'Impossible de lire l’état du traitement. La vérification va réessayer automatiquement.');
+        delay = Math.min(delay * 2, 8000);
+      } finally {
+        if (active && keepPolling) timer = setTimeout(() => void poll(), delay);
       }
-    }, status === 'SPLITTING' ? 1000 : 2500);
-    return () => { active = false; clearInterval(interval); };
+    };
+    timer = setTimeout(() => void poll(), delay);
+    return () => { active = false; keepPolling = false; clearTimeout(timer); };
   }, [trackId, status]);
 
   const pickFile = async () => {
@@ -99,6 +113,7 @@ export default function ImportScreen() {
     if (!file || busy) return;
     setBusy(true);
     setError(null);
+    setConnectionWarning(null);
     try {
       const formData = new FormData();
       if (Platform.OS === 'web') {
@@ -148,14 +163,9 @@ export default function ImportScreen() {
       if (step === 'transcription') setStatus('READY');
     } catch (processingError) {
       console.error(`${step} failed`, processingError);
-      const serverMessage = axios.isAxiosError(processingError)
-        ? processingError.response?.data?.message
+      const reason = axios.isAxiosError(processingError)
+        ? extractApiMessage(processingError.response?.data)
         : null;
-      const reason = Array.isArray(serverMessage)
-        ? serverMessage.join(', ')
-        : typeof serverMessage === 'string'
-          ? serverMessage
-          : null;
       const statusCode = axios.isAxiosError(processingError) ? processingError.response?.status : undefined;
       setError(statusCode === 502
         ? `Le service Demucs ne répond pas. Vérifiez qu’il est démarré sur le PC (port 8000), puis réessayez.${reason ? ` Détail : ${reason}` : ''}`
@@ -234,7 +244,7 @@ export default function ImportScreen() {
             </View>
           )}
 
-          {error && <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>}
+          {(error || connectionWarning) && <View style={styles.errorBox}><Text style={styles.errorText}>{error ?? connectionWarning}</Text></View>}
 
           {!trackId && <Pressable onPress={uploadFile} disabled={!file || busy} style={({ pressed }) => [styles.actionButton, (!file || busy) && styles.actionDisabled, pressed && file && styles.actionPressed]}>
             {busy ? <ActivityIndicator color={theme.colors.nuitStudio} /> : <><Text style={styles.actionText}>Importer dans le studio</Text><ArrowRight size={17} color={theme.colors.nuitStudio} /></>}
@@ -250,14 +260,18 @@ export default function ImportScreen() {
   );
 }
 
+function extractApiMessage(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(extractApiMessage).filter(Boolean).join(', ') || null;
+  if (typeof value === 'object' && value !== null && 'message' in value) {
+    return extractApiMessage(value.message);
+  }
+  return null;
+}
+
 function getUploadErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
-    const responseMessage = error.response?.data?.message;
-    const message = Array.isArray(responseMessage)
-      ? responseMessage.join(', ')
-      : typeof responseMessage === 'string'
-        ? responseMessage
-        : null;
+    const message = extractApiMessage(error.response?.data);
 
     if (error.response) {
       return message

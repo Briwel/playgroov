@@ -6,6 +6,7 @@ import axios from 'axios';
 
 import { BackButton } from '../../src/components/BackButton';
 import { API_URL } from '../../src/constants/api';
+import { notifyTrackDeleted } from '../../src/state/track-events';
 import { theme } from '../../src/theme';
 
 type Track = {
@@ -58,6 +59,7 @@ export default function HistoryScreen() {
     setDeleteError(null);
     try {
       await axios.delete(`${API_URL}/tracks/${track.id}`);
+      notifyTrackDeleted(track.id);
       setTracks((current) => current.filter((item) => item.id !== track.id));
       setDeleteTarget(null);
     } catch (deleteFailure) {
