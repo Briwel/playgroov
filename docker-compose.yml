@@ -1,0 +1,50 @@
+# PocketGroove Studio — Services audio
+#
+# Démarre les deux services Python en une commande :
+#   docker compose up -d
+#
+# Pour tout arrêter :
+#   docker compose down
+#
+# Pour rebuilder après une modification du code :
+#   docker compose up -d --build
+
+services:
+  demucs:
+    build:
+      context: ./services/demucs-service
+    container_name: pocketgroove-demucs
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistance du cache des modèles Demucs entre les redémarrages.
+      # Sans ce volume, les modèles seraient re-téléchargés à chaque démarrage.
+      - demucs-model-cache:/root/.cache/torch
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/tasks/00000000-0000-0000-0000-000000000000')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  basic-pitch:
+    build:
+      context: ./services/basic-pitch-service
+    container_name: pocketgroove-basic-pitch
+    ports:
+      - "8001:8001"
+    volumes:
+      # Persistance du cache des modèles Basic Pitch.
+      - basic-pitch-model-cache:/root/.cache/basic_pitch
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/midi/00000000-0000-0000-0000-000000000000')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  demucs-model-cache:
+  basic-pitch-model-cache:
