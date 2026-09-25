@@ -1,3 +1,4 @@
+from basic_pitch import ICASSP_2022_MODEL_PATH
 from basic_pitch.inference import predict_and_save
 import os
 import tempfile
@@ -21,8 +22,10 @@ def transcribe_audio(input_path: str, output_dir: str):
                 audio_path_list=[input_path],
                 output_directory=temp_dir,
                 save_midi=True,
+                sonify_midi=False,
                 save_model_outputs=False,
-                save_notes=False
+                save_notes=False,
+                model_or_model_path=ICASSP_2022_MODEL_PATH,
             )
             
             temp_midi_path = os.path.join(temp_dir, expected_midi_name)

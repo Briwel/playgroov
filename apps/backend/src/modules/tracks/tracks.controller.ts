@@ -1,8 +1,13 @@
 import { Controller, Post, Body, UseInterceptors, UploadedFile, Get, Param, Res, Delete } from '@nestjs/common';
+import * as fs from 'fs';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
 import { TracksService } from './tracks.service.js';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import type { Multer } from 'multer';
+
+const pipelineAsync = promisify(pipeline);
 
 @Controller('tracks')
 export class TracksController {
@@ -25,6 +30,14 @@ export class TracksController {
   @Get(':id')
   async getTrack(@Param('id') id: string) {
     return await this.tracksService.getTrack(id);
+  }
+
+  @Get(':id/midi')
+  async getMidiFile(@Param('id') id: string, @Res() response: Response) {
+    const file = await this.tracksService.getMidiFile(id);
+    response.setHeader('Content-Type', 'audio/midi');
+    response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+    await pipelineAsync(fs.createReadStream(file.filePath), response);
   }
 
   @Delete(':id')

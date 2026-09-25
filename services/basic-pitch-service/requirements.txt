@@ -1,7 +1,7 @@
 basic-pitch
+numpy<2
 flask
 gunicorn
-tensorflow
 fastapi
 uvicorn
 python-multipart

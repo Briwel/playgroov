@@ -26,15 +26,15 @@ export class TracksService {
           stems = [];
         }
       }
-      return { ...publicTrack, stems };
+      return { ...publicTrack, stems, midiAvailable: fs.existsSync(`${filePath}.mid`) };
     });
   }
 
   async deleteTrack(id: string) {
     const track = await this.prisma.track.findUnique({ where: { id } });
     if (!track) throw new NotFoundException('Track not found');
-    if (track.status === 'SPLITTING') {
-      throw new ConflictException('Attendez la fin de la séparation avant de supprimer ce morceau.');
+    if (track.status === 'SPLITTING' || track.status === 'TRANSCRIBING') {
+      throw new ConflictException('Attendez la fin du traitement audio avant de supprimer ce morceau.');
     }
 
     const uploadDirectory = path.resolve('./uploads');
@@ -61,7 +61,8 @@ export class TracksService {
     }
 
     await this.prisma.track.delete({ where: { id } });
-    for (const filePath of [sourcePath, stemsPath, taskPath]) {
+    const midiPath = `${sourcePath}.mid`;
+    for (const filePath of [sourcePath, stemsPath, taskPath, midiPath]) {
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (error) {
@@ -110,7 +111,15 @@ export class TracksService {
     const { filePath, ...publicTrack } = track;
     const metadataPath = `${track.filePath}.stems.json`;
     const stems = fs.existsSync(metadataPath) ? JSON.parse(fs.readFileSync(metadataPath, 'utf8')) : [];
-    return { ...publicTrack, stems };
+    return { ...publicTrack, stems, midiAvailable: fs.existsSync(`${track.filePath}.mid`) };
+  }
+
+  async getMidiFile(id: string) {
+    const track = await this.prisma.track.findUnique({ where: { id } });
+    if (!track) throw new NotFoundException('Morceau introuvable.');
+    const filePath = `${track.filePath}.mid`;
+    if (!fs.existsSync(filePath)) throw new NotFoundException('Aucune transcription MIDI n’est disponible pour ce morceau.');
+    return { filePath, filename: path.basename(filePath) };
   }
 
   async getStemFile(id: string, filename: string): Promise<AxiosResponse<Readable>> {

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { ArrowRight, AudioLines, Check, FileAudio2, Upload } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { ArrowRight, AudioLines, Check, FileAudio2, Share2, Upload } from 'lucide-react-native';
 import axios from 'axios';
 import { Link, useLocalSearchParams } from 'expo-router';
 
@@ -29,6 +31,7 @@ export default function ImportScreen() {
   const [error, setError] = useState<string | null>(null);
   const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [midiAvailable, setMidiAvailable] = useState(false);
 
   useEffect(() => {
     if (!requestedTrackId) return;
@@ -42,6 +45,7 @@ export default function ImportScreen() {
         setSourceName(response.data.title);
         setTrackId(response.data.id);
         setStatus(response.data.status as TrackStatus);
+        setMidiAvailable(Boolean(response.data.midiAvailable));
         setProgress(response.data.status === 'SPLIT' || response.data.status === 'READY' ? 100 : 0);
       } catch (restoreError) {
         console.error('Unable to restore track session', restoreError);
@@ -106,6 +110,7 @@ export default function ImportScreen() {
       setStatus(null);
       setProgress(0);
       setTrackId(null);
+      setMidiAvailable(false);
     }
   };
 
@@ -159,8 +164,11 @@ export default function ImportScreen() {
     if (step === 'stem-separation') setProgress(0);
     setStatus(step === 'stem-separation' ? 'SPLITTING' : 'TRANSCRIBING');
     try {
-      await axios.post(`${API_URL}/${step}/${trackId}`);
-      if (step === 'transcription') setStatus('READY');
+      const response = await axios.post(`${API_URL}/${step}/${trackId}`);
+      if (step === 'transcription') {
+        setStatus('READY');
+        setMidiAvailable(Boolean(response.data?.midiAvailable));
+      }
     } catch (processingError) {
       console.error(`${step} failed`, processingError);
       const reason = axios.isAxiosError(processingError)
@@ -168,9 +176,41 @@ export default function ImportScreen() {
         : null;
       const statusCode = axios.isAxiosError(processingError) ? processingError.response?.status : undefined;
       setError(statusCode === 502
-        ? `Le service Demucs ne répond pas. Vérifiez qu’il est démarré sur le PC (port 8000), puis réessayez.${reason ? ` Détail : ${reason}` : ''}`
+        ? `${step === 'stem-separation' ? 'Le service Demucs ne répond pas. Vérifiez qu’il est démarré sur le PC (port 8000)' : 'La transcription MIDI n’a pas abouti. Vérifiez que Basic Pitch fonctionne sur le port 8001'}${reason ? `. Détail : ${reason}` : '.'}`
         : reason ?? 'Le traitement a échoué. Vérifiez que le service audio est démarré, puis réessayez.');
       setStatus(step === 'stem-separation' ? 'IMPORTED' : 'SPLIT');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const shareMidi = async () => {
+    if (!trackId || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const safeBaseName = (sourceName ?? 'transcription').replace(/\.[^/.]+$/, '').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_');
+      const filename = `${safeBaseName || 'transcription'}.mid`;
+      const url = `${API_URL}/tracks/${encodeURIComponent(trackId)}/midi`;
+      if (Platform.OS === 'web') {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Téléchargement impossible (HTTP ${response.status}).`);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        anchor.click();
+        URL.revokeObjectURL(objectUrl);
+      } else {
+        if (!FileSystem.cacheDirectory) throw new Error('Espace temporaire indisponible sur cet appareil.');
+        const download = await FileSystem.downloadAsync(url, `${FileSystem.cacheDirectory}${filename}`);
+        if (!await Sharing.isAvailableAsync()) throw new Error('Le partage de fichiers n’est pas disponible sur cet appareil.');
+        await Sharing.shareAsync(download.uri, { mimeType: 'audio/midi', dialogTitle: 'Enregistrer ou partager le MIDI', UTI: 'public.midi-audio' });
+      }
+    } catch (shareError) {
+      const reason = axios.isAxiosError(shareError) ? extractApiMessage(shareError.response?.data) : null;
+      setError(reason ?? (shareError instanceof Error ? shareError.message : 'Le téléchargement du MIDI a échoué.'));
     } finally {
       setBusy(false);
     }
@@ -250,7 +290,8 @@ export default function ImportScreen() {
             {busy ? <ActivityIndicator color={theme.colors.nuitStudio} /> : <><Text style={styles.actionText}>Importer dans le studio</Text><ArrowRight size={17} color={theme.colors.nuitStudio} /></>}
           </Pressable>}
           {trackId && status === 'IMPORTED' && <ActionButton label="Isoler les pistes" detail="Séparation instrumentale" icon={<AudioLines size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={() => runProcessingStep('stem-separation')} />}
-          {trackId && status === 'SPLIT' && <ActionButton label="Créer une transcription MIDI" detail="Transformer l’audio en notes" icon={<ArrowRight size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={() => runProcessingStep('transcription')} />}
+          {trackId && (status === 'SPLIT' || (status === 'READY' && !midiAvailable)) && <ActionButton label="Créer une transcription MIDI" detail="Transformer l’audio en notes" icon={<ArrowRight size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={() => runProcessingStep('transcription')} />}
+          {trackId && status === 'READY' && midiAvailable && <ActionButton label="Partager le fichier MIDI" detail="Enregistrer ou envoyer la transcription" icon={<Share2 size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={shareMidi} />}
           {(status === 'SPLIT' || status === 'READY') && <Link href={{ pathname: '/stems', params: { trackId } }} asChild><Pressable style={styles.doneLink} accessibilityRole="button"><Text style={styles.doneText}>Écouter les pistes</Text></Pressable></Link>}
         </View>
 
