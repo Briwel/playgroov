@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { AudioLines, AudioWaveform, ChevronDown, Headphones, RotateCcw, SlidersHorizontal, Volume2 } from 'lucide-react-native';
 import axios from 'axios';
@@ -13,7 +13,7 @@ import { theme } from '../../src/theme';
 
 type Stem = { filename: string; name: string; taskId: string };
 type Track = { id: string; title: string; status: string; stems: Stem[] };
-type LoadedStem = Stem & { sound: Audio.Sound; color: string; label: string };
+type LoadedStem = Stem & { sound: AudioPlayer; color: string; label: string };
 
 const instrumentColors: Record<string, string> = {
   vocals: theme.colors.stems.voix,
@@ -89,25 +89,47 @@ export default function MixerScreen() {
           return;
         }
 
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true });
+        await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false, interruptionMode: 'duckOthers' });
         const results = await Promise.allSettled(currentTrack.stems.map(async (stem, index) => {
           const instrument = instrumentFor(stem.name);
           const uri = `${API_URL}/tracks/${encodeURIComponent(trackId)}/stems/${encodeURIComponent(stem.filename)}`;
-          const { sound } = await Audio.Sound.createAsync(
-            { uri },
-            { shouldPlay: false, volume: 1 },
-            (status) => {
-              if (cancelled || !status.isLoaded) return;
-              if (index === 0) {
-                positionRef.current = status.positionMillis;
-                setPosition(status.positionMillis);
-                if (status.durationMillis) setDuration(status.durationMillis);
-              }
-              if (status.didJustFinish) setPlaying(false);
-            },
-          );
+          const sound = createAudioPlayer({ uri }, { updateInterval: 250 });
           const loadedStem: LoadedStem = { ...stem, sound, ...instrument };
           createdSounds.push(loadedStem);
+
+          await new Promise<void>((resolve, reject) => {
+            let settled = false;
+            const subscription = sound.addListener('playbackStatusUpdate', (status) => {
+              if (cancelled) {
+                if (!settled) {
+                  settled = true;
+                  resolve();
+                }
+                return;
+              }
+
+              if (status.isLoaded && index === 0) {
+                positionRef.current = status.currentTime * 1000;
+                setPosition(status.currentTime * 1000);
+                if (status.duration > 0) setDuration(status.duration * 1000);
+              }
+              if (status.didJustFinish) setPlaying(false);
+
+              if (!settled && status.isLoaded) {
+                settled = true;
+                resolve();
+              } else if (!settled && status.error) {
+                settled = true;
+                subscription.remove();
+                reject(new Error(status.error));
+              }
+            });
+
+            if (sound.isLoaded && !settled) {
+              settled = true;
+              resolve();
+            }
+          });
           return loadedStem;
         }));
 
@@ -116,7 +138,7 @@ export default function MixerScreen() {
         const loaded = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
 
         if (cancelled) {
-          await Promise.all(createdSounds.map(({ sound }) => sound.unloadAsync().catch(() => undefined)));
+          createdSounds.forEach(({ sound }) => sound.remove());
           return;
         }
 
@@ -125,7 +147,7 @@ export default function MixerScreen() {
         setLevels(Object.fromEntries(loaded.map((stem) => [stem.filename, 7])));
       } catch (loadError) {
         console.error('Unable to load separated tracks', loadError);
-        await Promise.all(createdSounds.map(({ sound }) => sound.unloadAsync().catch(() => undefined)));
+        createdSounds.forEach(({ sound }) => sound.remove());
         if (!cancelled) setError('Impossible de charger les pistes audio. Vérifiez la connexion au serveur puis réessayez.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -135,7 +157,7 @@ export default function MixerScreen() {
     void loadSession();
     return () => {
       cancelled = true;
-      void Promise.all(createdSounds.map(({ sound }) => sound.unloadAsync().catch(() => undefined)));
+      createdSounds.forEach(({ sound }) => sound.remove());
     };
   }, [trackId]);
 
@@ -145,8 +167,8 @@ export default function MixerScreen() {
       const gain = levels[stem.filename] ?? 7;
       const decibels = (gain - 7) * 2;
       const trackVolume = gain === 0 ? 0 : Math.min(1, 10 ** (decibels / 20));
-      void stem.sound.setIsMutedAsync(isMuted).catch(() => undefined);
-      void stem.sound.setVolumeAsync(trackVolume * (masterLevel / 12)).catch(() => undefined);
+      stem.sound.muted = isMuted;
+      stem.sound.volume = trackVolume * (masterLevel / 12);
     }
   }, [loadedStems, muted, solo, levels, masterLevel]);
 
@@ -162,17 +184,18 @@ export default function MixerScreen() {
     const clamped = Math.max(0, Math.min(duration, nextPosition));
     positionRef.current = clamped;
     setPosition(clamped);
-    await Promise.all(soundsRef.current.map(({ sound }) => sound.setPositionAsync(clamped).catch(() => undefined)));
+    await Promise.all(soundsRef.current.map(({ sound }) => sound.seekTo(clamped / 1000).catch(() => undefined)));
   }, [duration]);
 
   const togglePlayback = useCallback(async () => {
     if (!soundsRef.current.length) return;
     if (playing) {
-      await Promise.all(soundsRef.current.map(({ sound }) => sound.pauseAsync().catch(() => undefined)));
+      soundsRef.current.forEach(({ sound }) => sound.pause());
       setPlaying(false);
       return;
     }
-    await Promise.all(soundsRef.current.map(({ sound }) => sound.playFromPositionAsync(positionRef.current).catch(() => undefined)));
+    await Promise.all(soundsRef.current.map(({ sound }) => sound.seekTo(positionRef.current / 1000)));
+    soundsRef.current.forEach(({ sound }) => sound.play());
     setPlaying(true);
   }, [playing]);
 

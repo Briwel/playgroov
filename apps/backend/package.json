@@ -2,6 +2,7 @@
   "name": "pocketgroove-backend",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "start": "nest start",
