@@ -40,6 +40,19 @@ export class TracksController {
     await pipelineAsync(fs.createReadStream(file.filePath), response);
   }
 
+  @Get(':id/transcriptions')
+  async getTranscriptions(@Param('id') id: string) {
+    return await this.tracksService.getTranscriptions(id);
+  }
+
+  @Get(':id/transcriptions/:stemName')
+  async getStemMidiFile(@Param('id') id: string, @Param('stemName') stemName: string, @Res() response: Response) {
+    const file = await this.tracksService.getStemMidiFile(id, stemName);
+    response.setHeader('Content-Type', 'audio/midi');
+    response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+    await pipelineAsync(fs.createReadStream(file.filePath), response);
+  }
+
   @Delete(':id')
   async deleteTrack(@Param('id') id: string) {
     return await this.tracksService.deleteTrack(id);

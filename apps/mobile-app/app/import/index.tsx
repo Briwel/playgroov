@@ -3,7 +3,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { ArrowRight, AudioLines, Check, FileAudio2, Share2, Upload } from 'lucide-react-native';
+import { ArrowRight, AudioLines, Check, FileAudio2, Music2, Share2, Upload } from 'lucide-react-native';
 import axios from 'axios';
 import { Link, useLocalSearchParams } from 'expo-router';
 
@@ -12,6 +12,7 @@ import { BackButton } from '../../src/components/BackButton';
 import { theme } from '../../src/theme';
 
 type TrackStatus = 'IMPORTED' | 'SPLITTING' | 'SPLIT' | 'TRANSCRIBING' | 'READY';
+type StemTranscription = { stemName: string; label: string; filename: string };
 
 const steps = [
   { key: 'import', label: 'Importer', number: '01' },
@@ -32,6 +33,7 @@ export default function ImportScreen() {
   const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [midiAvailable, setMidiAvailable] = useState(false);
+  const [transcriptions, setTranscriptions] = useState<StemTranscription[]>([]);
 
   useEffect(() => {
     if (!requestedTrackId) return;
@@ -46,6 +48,7 @@ export default function ImportScreen() {
         setTrackId(response.data.id);
         setStatus(response.data.status as TrackStatus);
         setMidiAvailable(Boolean(response.data.midiAvailable));
+        setTranscriptions(Array.isArray(response.data.transcriptions) ? response.data.transcriptions : []);
         setProgress(response.data.status === 'SPLIT' || response.data.status === 'READY' ? 100 : 0);
       } catch (restoreError) {
         console.error('Unable to restore track session', restoreError);
@@ -82,6 +85,10 @@ export default function ImportScreen() {
           const nextStatus = response.data.status as TrackStatus;
           if (!active) return;
           setStatus(nextStatus);
+          if (nextStatus === 'READY') {
+            setMidiAvailable(Boolean(response.data.midiAvailable));
+            setTranscriptions(Array.isArray(response.data.transcriptions) ? response.data.transcriptions : []);
+          }
           if (nextStatus === 'READY' || nextStatus === 'SPLIT') keepPolling = false;
         }
         setConnectionWarning(null);
@@ -111,6 +118,7 @@ export default function ImportScreen() {
       setProgress(0);
       setTrackId(null);
       setMidiAvailable(false);
+      setTranscriptions([]);
     }
   };
 
@@ -168,6 +176,10 @@ export default function ImportScreen() {
       if (step === 'transcription') {
         setStatus('READY');
         setMidiAvailable(Boolean(response.data?.midiAvailable));
+        setTranscriptions(Array.isArray(response.data?.transcriptions) ? response.data.transcriptions : []);
+        if (Array.isArray(response.data?.failures) && response.data.failures.length) {
+          setError(`Certaines pistes n’ont pas pu être transcrites : ${response.data.failures.join(' · ')}`);
+        }
       }
     } catch (processingError) {
       console.error(`${step} failed`, processingError);
@@ -184,14 +196,16 @@ export default function ImportScreen() {
     }
   };
 
-  const shareMidi = async () => {
+  const shareMidi = async (stem?: StemTranscription) => {
     if (!trackId || busy) return;
     setBusy(true);
     setError(null);
     try {
       const safeBaseName = (sourceName ?? 'transcription').replace(/\.[^/.]+$/, '').replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_');
-      const filename = `${safeBaseName || 'transcription'}.mid`;
-      const url = `${API_URL}/tracks/${encodeURIComponent(trackId)}/midi`;
+      const filename = stem?.filename ?? `${safeBaseName || 'transcription'}.mid`;
+      const url = stem
+        ? `${API_URL}/tracks/${encodeURIComponent(trackId)}/transcriptions/${encodeURIComponent(stem.stemName)}`
+        : `${API_URL}/tracks/${encodeURIComponent(trackId)}/midi`;
       if (Platform.OS === 'web') {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Téléchargement impossible (HTTP ${response.status}).`);
@@ -270,7 +284,7 @@ export default function ImportScreen() {
           )}
 
           {status && (
-            <View style={styles.statusCard}>
+          <View style={styles.statusCard}>
               {busy || status === 'SPLITTING' ? <ActivityIndicator size="small" color={theme.colors.vertStudio} /> : <View style={styles.statusDot} />}
               <View style={styles.fileInfo}>
                 <Text style={styles.statusTitle}>{statusLabel(status)}</Text>
@@ -286,12 +300,49 @@ export default function ImportScreen() {
 
           {(error || connectionWarning) && <View style={styles.errorBox}><Text style={styles.errorText}>{error ?? connectionWarning}</Text></View>}
 
+          {status === 'READY' && transcriptions.length > 0 && <View style={styles.transcriptionList}>
+            <Text style={styles.transcriptionTitle}>Partitions & MIDI par piste</Text>
+            <Text style={styles.transcriptionHint}>Consultez la partition ou téléchargez le fichier MIDI pour chaque instrument.</Text>
+            {transcriptions.map((item) => (
+              <View key={item.stemName} style={styles.midiItem}>
+                <View style={styles.midiItemCopy}>
+                  <Text style={styles.midiItemTitle}>{item.label}</Text>
+                  <Text style={styles.midiItemHint}>{item.stemName}</Text>
+                </View>
+                <View style={styles.midiItemActions}>
+                  <Link
+                    href={{
+                      pathname: '/score',
+                      params: { trackId: trackId ?? '', stemName: item.stemName, trackTitle: sourceName ?? '' },
+                    }}
+                    asChild
+                  >
+                    <Pressable style={styles.scorePill} accessibilityRole="button" accessibilityLabel={`Voir la partition ${item.label}`}>
+                      <Music2 size={13} color={theme.colors.vertStudio} />
+                      <Text style={styles.scorePillText}>Partition</Text>
+                    </Pressable>
+                  </Link>
+                  <Pressable
+                    onPress={() => void shareMidi(item)}
+                    disabled={busy}
+                    style={({ pressed }) => [styles.downloadPill, pressed && styles.actionPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Télécharger MIDI ${item.label}`}
+                  >
+                    <Share2 size={13} color={theme.colors.grisSignal} />
+                    <Text style={styles.downloadPillText}>MIDI</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>}
+
           {!trackId && <Pressable onPress={uploadFile} disabled={!file || busy} style={({ pressed }) => [styles.actionButton, (!file || busy) && styles.actionDisabled, pressed && file && styles.actionPressed]}>
             {busy ? <ActivityIndicator color={theme.colors.nuitStudio} /> : <><Text style={styles.actionText}>Importer dans le studio</Text><ArrowRight size={17} color={theme.colors.nuitStudio} /></>}
           </Pressable>}
           {trackId && status === 'IMPORTED' && <ActionButton label="Isoler les pistes" detail="Séparation instrumentale" icon={<AudioLines size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={() => runProcessingStep('stem-separation')} />}
           {trackId && (status === 'SPLIT' || (status === 'READY' && !midiAvailable)) && <ActionButton label="Créer une transcription MIDI" detail="Transformer l’audio en notes" icon={<ArrowRight size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={() => runProcessingStep('transcription')} />}
-          {trackId && status === 'READY' && midiAvailable && <ActionButton label="Partager le fichier MIDI" detail="Enregistrer ou envoyer la transcription" icon={<Share2 size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={shareMidi} />}
+          {trackId && status === 'READY' && midiAvailable && transcriptions.length === 0 && <ActionButton label="Partager le fichier MIDI" detail="Enregistrer ou envoyer la transcription" icon={<Share2 size={17} color={theme.colors.nuitStudio} />} busy={busy} onPress={() => void shareMidi()} />}
           {(status === 'SPLIT' || status === 'READY') && <Link href={{ pathname: '/stems', params: { trackId } }} asChild><Pressable style={styles.doneLink} accessibilityRole="button"><Text style={styles.doneText}>Écouter les pistes</Text></Pressable></Link>}
         </View>
 
@@ -409,6 +460,18 @@ const styles = StyleSheet.create({
   actionDetail: { color: '#424D33', fontSize: 10, marginTop: 2 },
   doneLink: { minHeight: 42, width: 190, marginTop: 15, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 9, backgroundColor: theme.colors.vertStudio },
   doneText: { width: '100%', color: theme.colors.nuitStudio, fontFamily: theme.typography.manrope.semiBold, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  transcriptionList: { marginTop: 16, gap: 8 },
+  transcriptionTitle: { color: theme.colors.blancCasse, fontFamily: theme.typography.manrope.semiBold, fontSize: 13, fontWeight: '700' },
+  transcriptionHint: { color: theme.colors.grisSignal, fontSize: 10, lineHeight: 15, marginTop: -4, marginBottom: 2 },
+  midiItem: { minHeight: 52, borderWidth: 1, borderColor: theme.colors.ligne, borderRadius: 8, backgroundColor: theme.colors.nuitStudio, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  midiItemCopy: { flex: 1, gap: 2 },
+  midiItemTitle: { color: theme.colors.blancCasse, fontSize: 12, fontWeight: '600' },
+  midiItemHint: { color: theme.colors.grisSignal, fontSize: 10 },
+  midiItemActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  scorePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#C3F36B40', backgroundColor: '#1A2316' },
+  scorePillText: { color: theme.colors.vertStudio, fontSize: 11, fontWeight: '700' },
+  downloadPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.ligne, backgroundColor: theme.colors.console },
+  downloadPillText: { color: theme.colors.grisSignal, fontSize: 11, fontWeight: '600' },
   privacy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 17 },
   privacyMark: { width: 19, height: 19, borderRadius: 10, backgroundColor: '#283022', alignItems: 'center', justifyContent: 'center' },
   privacyText: { color: theme.colors.grisSignal, fontSize: 10 },

@@ -1,4 +1,4 @@
-import { AudioLines, Minus, Plus } from 'lucide-react-native';
+import { AudioLines, Minus, Music2, Plus } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '../theme';
@@ -10,12 +10,14 @@ type TrackStripProps = {
   muted: boolean;
   solo: boolean;
   compact?: boolean;
+  hasScore?: boolean;
   onLevelChange: (value: number) => void;
   onToggleMute: () => void;
   onToggleSolo: () => void;
+  onViewScore?: () => void;
 };
 
-export function TrackStrip({ name, color, level, muted, solo, compact = false, onLevelChange, onToggleMute, onToggleSolo }: TrackStripProps) {
+export function TrackStrip({ name, color, level, muted, solo, compact = false, hasScore = false, onLevelChange, onToggleMute, onToggleSolo, onViewScore }: TrackStripProps) {
   const db = (level - 7) * 2;
   return (
     <View style={[styles.container, compact && styles.containerCompact, muted && styles.containerMuted]}>
@@ -30,6 +32,7 @@ export function TrackStrip({ name, color, level, muted, solo, compact = false, o
             <View style={styles.trackActions}>
               <Pressable onPress={onToggleSolo} accessibilityRole="button" accessibilityState={{ selected: solo }} accessibilityLabel={`${solo ? 'Désactiver' : 'Activer'} solo ${name}`} style={[styles.actionButton, solo && styles.soloActive]}><Text style={[styles.actionText, solo && styles.soloText]}>S</Text></Pressable>
               <Pressable onPress={onToggleMute} accessibilityRole="button" accessibilityState={{ selected: muted }} accessibilityLabel={`${muted ? 'Réactiver' : 'Couper'} ${name}`} style={[styles.actionButton, muted && styles.muteActive]}><Text style={[styles.actionText, muted && styles.muteText]}>M</Text></Pressable>
+              {onViewScore && <Pressable onPress={onViewScore} accessibilityRole="button" accessibilityLabel={`Voir la partition de ${name}`} style={[styles.actionButton, hasScore && styles.scoreActive]}><Music2 size={13} color={hasScore ? color : theme.colors.grisSignal} /></Pressable>}
             </View>
           </View>
           <View style={styles.compactControls}>
@@ -60,6 +63,7 @@ export function TrackStrip({ name, color, level, muted, solo, compact = false, o
           <View style={styles.trackActions}>
             <Pressable onPress={onToggleSolo} accessibilityRole="button" accessibilityState={{ selected: solo }} accessibilityLabel={`${solo ? 'Désactiver' : 'Activer'} solo ${name}`} style={[styles.actionButton, solo && styles.soloActive]}><Text style={[styles.actionText, solo && styles.soloText]}>S</Text></Pressable>
             <Pressable onPress={onToggleMute} accessibilityRole="button" accessibilityState={{ selected: muted }} accessibilityLabel={`${muted ? 'Réactiver' : 'Couper'} ${name}`} style={[styles.actionButton, muted && styles.muteActive]}><Text style={[styles.actionText, muted && styles.muteText]}>M</Text></Pressable>
+            {onViewScore && <Pressable onPress={onViewScore} accessibilityRole="button" accessibilityLabel={`Voir la partition de ${name}`} style={[styles.actionButton, hasScore && styles.scoreActive]}><Music2 size={13} color={hasScore ? color : theme.colors.grisSignal} /></Pressable>}
           </View>
         </>
       )}
@@ -94,4 +98,5 @@ const styles = StyleSheet.create({
   soloText: { color: theme.colors.ambre },
   muteActive: { backgroundColor: '#402A27', borderColor: theme.colors.state.erreur },
   muteText: { color: theme.colors.state.erreur },
+  scoreActive: { backgroundColor: '#1E2A1A', borderColor: '#C3F36B' },
 });

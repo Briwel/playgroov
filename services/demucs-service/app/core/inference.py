@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 
@@ -10,7 +11,10 @@ def separate_stems(input_path: str, output_dir: str, model="htdemucs_6s", progre
     os.makedirs(output_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        cmd = ["demucs", "-n", model, "-o", temp_dir, input_path]
+        # Calling the installed console launcher (demucs.exe) can be blocked by
+        # Windows application-control policies. Invoke the same module through
+        # the active Python interpreter instead.
+        cmd = [sys.executable, "-m", "demucs", "-n", model, "-o", temp_dir, input_path]
         # Demucs prints track names and paths to stdout. On Windows, Python can
         # inherit the legacy cp1252 console encoding and crash when a name has
         # characters outside that encoding. Force UTF-8 in the child process.

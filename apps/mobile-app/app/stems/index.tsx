@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { AudioLines, AudioWaveform, ChevronDown, Headphones, RotateCcw, SlidersHorizontal, Volume2 } from 'lucide-react-native';
 import axios from 'axios';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -15,6 +15,7 @@ import { theme } from '../../src/theme';
 type Stem = { filename: string; name: string; taskId: string };
 type Track = { id: string; title: string; status: string; stems: Stem[] };
 type LoadedStem = Stem & { sound: AudioPlayer; color: string; label: string };
+type StemTranscription = { stemName: string; label: string; filename: string };
 
 const instrumentColors: Record<string, string> = {
   vocals: theme.colors.stems.voix,
@@ -55,6 +56,7 @@ export default function MixerScreen() {
   const [duration, setDuration] = useState(0);
   const [loading, setLoading] = useState(Boolean(trackId));
   const [error, setError] = useState<string | null>(null);
+  const [transcriptions, setTranscriptions] = useState<StemTranscription[]>([]);
   const soundsRef = useRef<LoadedStem[]>([]);
   const positionRef = useRef(0);
   const deletedTrackIdRef = useRef<string | null>(null);
@@ -167,6 +169,12 @@ export default function MixerScreen() {
         soundsRef.current = loaded;
         setLoadedStems(loaded);
         setLevels(Object.fromEntries(loaded.map((stem) => [stem.filename, 7])));
+
+        // Load available transcriptions (non-blocking)
+        try {
+          const transcriptionRes = await axios.get<StemTranscription[]>(`${API_URL}/tracks/${trackId}/transcriptions`);
+          if (Array.isArray(transcriptionRes.data)) setTranscriptions(transcriptionRes.data);
+        } catch { /* Transcriptions are optional — don't block mixer on failure */ }
       } catch (loadError) {
         console.error('Unable to load separated tracks', loadError);
         createdSounds.forEach(({ sound }) => sound.remove());
@@ -276,9 +284,14 @@ export default function MixerScreen() {
                   muted={muted.includes(stem.filename) || (solo !== null && solo !== stem.filename)}
                   solo={solo === stem.filename}
                   compact={compact}
+                  hasScore={transcriptions.some((t) => t.stemName === stem.name)}
                   onLevelChange={(value) => changeLevel(stem.filename, value)}
                   onToggleMute={() => toggleMute(stem.filename)}
                   onToggleSolo={() => setSolo((current) => current === stem.filename ? null : stem.filename)}
+                  onViewScore={() => router.push({
+                    pathname: '/score',
+                    params: { trackId, stemName: stem.name, trackTitle: track?.title },
+                  })}
                 />
               ))}
             </View>

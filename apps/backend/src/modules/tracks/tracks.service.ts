@@ -26,7 +26,8 @@ export class TracksService {
           stems = [];
         }
       }
-      return { ...publicTrack, stems, midiAvailable: fs.existsSync(`${filePath}.mid`) };
+      const transcriptions = this.readTranscriptions(filePath);
+      return { ...publicTrack, stems, transcriptions, midiAvailable: transcriptions.some((item) => fs.existsSync(path.join(path.dirname(filePath), item.filename))) || fs.existsSync(`${filePath}.mid`) };
     });
   }
 
@@ -45,6 +46,7 @@ export class TracksService {
     }
 
     const stemsPath = `${track.filePath}.stems.json`;
+    const transcriptionsPath = `${track.filePath}.transcriptions.json`;
     const taskPath = `${track.filePath}.separation.json`;
     const taskIds = new Set<string>();
     try {
@@ -62,7 +64,13 @@ export class TracksService {
 
     await this.prisma.track.delete({ where: { id } });
     const midiPath = `${sourcePath}.mid`;
-    for (const filePath of [sourcePath, stemsPath, taskPath, midiPath]) {
+    let transcriptionFiles: string[] = [];
+    try {
+      const items = JSON.parse(fs.readFileSync(transcriptionsPath, 'utf8')) as Array<{ filename?: string }>;
+      transcriptionFiles = items.map((item) => item.filename).filter((name): name is string => Boolean(name))
+        .map((name) => path.join(path.dirname(sourcePath), path.basename(name)));
+    } catch { /* Missing metadata is fine when no transcriptions were generated. */ }
+    for (const filePath of [sourcePath, stemsPath, taskPath, midiPath, transcriptionsPath, ...transcriptionFiles]) {
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch (error) {
@@ -111,7 +119,8 @@ export class TracksService {
     const { filePath, ...publicTrack } = track;
     const metadataPath = `${track.filePath}.stems.json`;
     const stems = fs.existsSync(metadataPath) ? JSON.parse(fs.readFileSync(metadataPath, 'utf8')) : [];
-    return { ...publicTrack, stems, midiAvailable: fs.existsSync(`${track.filePath}.mid`) };
+    const transcriptions = this.readTranscriptions(track.filePath);
+    return { ...publicTrack, stems, transcriptions, midiAvailable: transcriptions.some((item) => fs.existsSync(path.join(path.dirname(track.filePath), item.filename))) || fs.existsSync(`${track.filePath}.mid`) };
   }
 
   async getMidiFile(id: string) {
@@ -120,6 +129,24 @@ export class TracksService {
     const filePath = `${track.filePath}.mid`;
     if (!fs.existsSync(filePath)) throw new NotFoundException('Aucune transcription MIDI n’est disponible pour ce morceau.');
     return { filePath, filename: path.basename(filePath) };
+  }
+
+  async getStemMidiFile(id: string, stemName: string) {
+    const track = await this.prisma.track.findUnique({ where: { id } });
+    if (!track) throw new NotFoundException('Morceau introuvable.');
+    const transcription = this.readTranscriptions(track.filePath).find((item) => item.stemName === stemName);
+    if (!transcription) throw new NotFoundException('Aucun MIDI n’est disponible pour cette piste.');
+    const filePath = path.join(path.dirname(track.filePath), path.basename(transcription.filename));
+    if (!fs.existsSync(filePath)) throw new NotFoundException('Le fichier MIDI de cette piste est introuvable.');
+    return { filePath, filename: path.basename(filePath) };
+  }
+
+  async getTranscriptions(id: string) {
+    const track = await this.prisma.track.findUnique({ where: { id } });
+    if (!track) throw new NotFoundException('Morceau introuvable.');
+    return this.readTranscriptions(track.filePath).filter((item) =>
+      fs.existsSync(path.join(path.dirname(track.filePath), path.basename(item.filename))),
+    );
   }
 
   async getStemFile(id: string, filename: string): Promise<AxiosResponse<Readable>> {
@@ -144,5 +171,12 @@ export class TracksService {
     } catch {
       throw new BadGatewayException('Unable to retrieve this audio stem');
     }
+  }
+
+  private readTranscriptions(filePath: string): Array<{ stemName: string; label: string; filename: string }> {
+    try {
+      const items = JSON.parse(fs.readFileSync(`${filePath}.transcriptions.json`, 'utf8')) as Array<{ stemName: string; label: string; filename: string }>;
+      return Array.isArray(items) ? items.filter((item) => item?.stemName && item?.filename) : [];
+    } catch { return []; }
   }
 }
