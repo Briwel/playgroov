@@ -1,6 +1,7 @@
 demucs
 torch
 torchaudio
+numpy<2
 flask
 gunicorn
 fastapi

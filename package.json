@@ -6,9 +6,18 @@
     "services/*"
   ],
   "scripts": {
-    "setup": "npm install"
+    "setup": "npm install",
+    "dev": "powershell -ExecutionPolicy Bypass -File ./scripts/dev.ps1",
+    "dev:tunnel": "powershell -ExecutionPolicy Bypass -File ./scripts/dev.ps1 -Tunnel",
+    "dev:stop": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-stop.ps1",
+    "dev:backend": "npm run start:dev --workspace=pocketgroove-backend",
+    "dev:mobile": "npx expo start --workspace=pocketgroove-mobile",
+    "dev:docker": "docker compose up -d --build"
   },
   "dependencies": {
     "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417"
+  },
+  "devDependencies": {
+    "@expo/ngrok": "^4.1.3"
   }
 }
